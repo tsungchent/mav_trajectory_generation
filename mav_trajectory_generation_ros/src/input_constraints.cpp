@@ -19,13 +19,16 @@
  */
 
 #include <cmath>
-
 #include <glog/logging.h>
-#include <yaml-cpp/yaml.h>
-
-#include <mav_msgs/default_values.h>
 
 #include "mav_trajectory_generation_ros/input_constraints.h"
+#include <mav_msgs/default_values.h>
+
+
+
+#ifndef M_PI
+#define M_PI 3.1415926535897932384626433832795
+#endif
 
 namespace mav_trajectory_generation {
 typedef InputConstraintType ICT;

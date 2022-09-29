@@ -1,5 +1,6 @@
-#include <ros/ros.h>
-#include <ros/package.h>
+// #include <ros/ros.h>
+// #include <ros/package.h>
+#include <rclcpp/rclcpp.hpp>
 #include <numeric>
 
 #include <mav_visualization/helpers.h>
@@ -40,8 +41,8 @@ struct TimeAllocationBenchmarkResult {
 
 class TimeEvaluationNode {
  public:
-  TimeEvaluationNode(const ros::NodeHandle& nh,
-                     const ros::NodeHandle& nh_private);
+  TimeEvaluationNode(const rclcpp::Node::SharedPtr& nh/*,
+                     const ros::NodeHandle& nh_private*/);
 
   // Number of Coefficients
   const static int kN = 10;  // has to be even !!
@@ -76,15 +77,15 @@ class TimeEvaluationNode {
 
   void visualizeTrajectory(const std::string& method_name,
                            const Trajectory& traj,
-                           visualization_msgs::MarkerArray* markers) const;
+                           visualization_msgs::msg::MarkerArray* markers) const;
 
   // Accessors.
   bool visualize() const { return visualize_; }
 
   // Helpers.
-  visualization_msgs::Marker createMarkerForPath(
+  visualization_msgs::msg::Marker createMarkerForPath(
       mav_msgs::EigenTrajectoryPointVector& path,
-      const std_msgs::ColorRGBA& color, const std::string& name,
+      const std_msgs::msg::ColorRGBA& color, const std::string& name,
       double scale = 0.05) const;
 
   bool computeMinMaxMagnitudeAllSegments(const Segment::Vector& segments,
@@ -99,8 +100,8 @@ class TimeEvaluationNode {
   void outputResultsToFile(const std::string& filename) const;
 
  private:
-  ros::NodeHandle nh_;
-  ros::NodeHandle nh_private_;
+  rclcpp::Node::SharedPtr nh_;
+  // ros::NodeHandle nh_private_;
 
   // General settings.
   std::string frame_id_;
@@ -118,26 +119,29 @@ class TimeEvaluationNode {
   std::vector<TimeAllocationBenchmarkResult> results_;
 
   // ROS stuff.
-  ros::Publisher path_marker_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr path_marker_pub_;
 };
 
-TimeEvaluationNode::TimeEvaluationNode(const ros::NodeHandle& nh,
-                                       const ros::NodeHandle& nh_private)
+TimeEvaluationNode::TimeEvaluationNode(const rclcpp::Node::SharedPtr& nh/*,
+                                       const ros::NodeHandle& nh_private*/)
     : nh_(nh),
-      nh_private_(nh_private),
+      //nh_private_(nh_private),
       frame_id_("world"),
       visualize_(false),
       print_debug_info_(true),
       v_max_(1.0),
       a_max_(2.0),
       max_derivative_order_(derivative_order::JERK) {
-  nh_private_.param("frame_id", frame_id_, frame_id_);
-  nh_private_.param("visualize", visualize_, visualize_);
-  nh_private_.param("v_max", v_max_, v_max_);
-  nh_private_.param("a_max", a_max_, a_max_);
-
-  path_marker_pub_ =
-      nh_private_.advertise<visualization_msgs::MarkerArray>("path", 1, true);
+    nh_->set_parameter(rclcpp::Parameter("frame_id", frame_id_));
+    nh_->set_parameter(rclcpp::Parameter("visualize", visualize_));
+    nh_->set_parameter(rclcpp::Parameter("v_max", v_max_));
+    nh_->set_parameter(rclcpp::Parameter("a_max", a_max_));
+  //nh_private_.param("frame_id", frame_id_, frame_id_);
+  //nh_private_.param("visualize", visualize_, visualize_);
+  //nh_private_.param("v_max", v_max_, v_max_);
+  //nh_private_.param("a_max", a_max_, a_max_);
+    path_marker_pub_ = nh_->create_publisher<visualization_msgs::msg::MarkerArray>("path", 10);
+   // nh_private_.advertise<visualization_msgs::msg::MarkerArray>("path", 1, true);
 }
 
 void TimeEvaluationNode::runBenchmark(int trial_number, int num_segments) {
@@ -176,7 +180,7 @@ void TimeEvaluationNode::runBenchmark(int trial_number, int num_segments) {
   }
   result.nominal_length = nominal_length;
 
-  visualization_msgs::MarkerArray markers;
+  visualization_msgs::msg::MarkerArray markers;
   if (visualize_) {
     drawVertices(vertices, frame_id_, &markers);
     markers.markers.back().scale.x = 0.1;
@@ -188,8 +192,8 @@ void TimeEvaluationNode::runBenchmark(int trial_number, int num_segments) {
 
   // Run all the evaluations.
   std::string method_name = "nfabian";
-  ROS_INFO_STREAM("Trial " << trial_number << " Segments " << num_segments
-                           << " Starting evaluation: " << method_name);
+  RCLCPP_INFO(nh_->get_logger(), "Trial %d Segments %d  Starting evaluation: %s", trial_number, num_segments, method_name.c_str());
+
   Trajectory trajectory_nfabian;
   timing::Timer timer_nfabian(method_name);
   mini_timer.start();
@@ -206,8 +210,7 @@ void TimeEvaluationNode::runBenchmark(int trial_number, int num_segments) {
   }
 
   method_name = "trapezoidal";
-  ROS_INFO_STREAM("Trial " << trial_number << " Segments " << num_segments
-                           << " Starting evaluation: " << method_name);
+  RCLCPP_INFO(nh_->get_logger(), "Trial %d Segments %d  Starting evaluation: %s", trial_number, num_segments, method_name.c_str());
   Trajectory trajectory_trapezoidal;
   timing::Timer timer_trapezoidal(method_name);
   mini_timer.start();
@@ -224,8 +227,8 @@ void TimeEvaluationNode::runBenchmark(int trial_number, int num_segments) {
   }
 
   method_name = "segment_violation_scaling";
-  ROS_INFO_STREAM("Trial " << trial_number << " Segments " << num_segments
-                           << " Starting evaluation: " << method_name);
+  RCLCPP_INFO(nh_->get_logger(), "Trial %d Segments %d  Starting evaluation: %s", trial_number, num_segments, method_name.c_str());
+  
   Trajectory trajectory_segment_violation_scaling;
   timing::Timer timer_segment_violation_scaling(method_name);
   mini_timer.start();
@@ -243,8 +246,8 @@ void TimeEvaluationNode::runBenchmark(int trial_number, int num_segments) {
   }
 
   method_name = "nonlinear_time_only";
-  ROS_INFO_STREAM("Trial " << trial_number << " Segments " << num_segments
-                           << " Starting evaluation: " << method_name);
+  RCLCPP_INFO(nh_->get_logger(), "Trial %d Segments %d  Starting evaluation: %s", trial_number, num_segments, method_name.c_str());
+
   Trajectory trajectory_nonlinear_time;
   timing::Timer timer_nonlinear_time(method_name);
   mini_timer.start();
@@ -261,8 +264,8 @@ void TimeEvaluationNode::runBenchmark(int trial_number, int num_segments) {
   }
 
   method_name = "nonlinear";
-  ROS_INFO_STREAM("Trial " << trial_number << " Segments " << num_segments
-                           << " Starting evaluation: " << method_name);
+  RCLCPP_INFO(nh_->get_logger(), "Trial %d Segments %d  Starting evaluation: %s", trial_number, num_segments, method_name.c_str());
+
   Trajectory trajectory_nonlinear;
   timing::Timer timer_nonlinear(method_name);
   mini_timer.start();
@@ -279,8 +282,8 @@ void TimeEvaluationNode::runBenchmark(int trial_number, int num_segments) {
   }
 
   method_name = "nonlinear_richter";
-  ROS_INFO_STREAM("Trial " << trial_number << " Segments " << num_segments
-                           << " Starting evaluation: " << method_name);
+  RCLCPP_INFO(nh_->get_logger(), "Trial %d Segments %d  Starting evaluation: %s", trial_number, num_segments, method_name.c_str());
+
   Trajectory trajectory_nonlinear_richter;
   timing::Timer timer_nonlinear_richter(method_name);
   mini_timer.start();
@@ -297,8 +300,8 @@ void TimeEvaluationNode::runBenchmark(int trial_number, int num_segments) {
   }
 
   method_name = "mellinger_outer_loop";
-  ROS_INFO_STREAM("Trial " << trial_number << " Segments " << num_segments
-                           << " Starting evaluation: " << method_name);
+  RCLCPP_INFO(nh_->get_logger(), "Trial %d Segments %d  Starting evaluation: %s", trial_number, num_segments, method_name.c_str());
+
   Trajectory trajectory_mellinger_outer_loop;
   timing::Timer timer_mellinger(method_name);
   mini_timer.start();
@@ -315,8 +318,8 @@ void TimeEvaluationNode::runBenchmark(int trial_number, int num_segments) {
   }
 
   method_name = "mellinger_outer_loop_trapezoidal_init";
-  ROS_INFO_STREAM("Trial " << trial_number << " Segments " << num_segments
-                           << " Starting evaluation: " << method_name);
+  RCLCPP_INFO(nh_->get_logger(), "Trial %d Segments %d  Starting evaluation: %s", trial_number, num_segments, method_name.c_str());
+
   Trajectory trajectory_mellinger_outer_loop_trapezoidal_init;
   timing::Timer timer_mellinger_trapezoidal(method_name);
   mini_timer.start();
@@ -335,7 +338,7 @@ void TimeEvaluationNode::runBenchmark(int trial_number, int num_segments) {
                         &markers);
   }
   if (visualize_) {
-    path_marker_pub_.publish(markers);
+    path_marker_pub_->publish(markers);
   }
 }
 
@@ -594,7 +597,7 @@ int TimeEvaluationNode::runSegmentViolationScalingTime(
 
 void TimeEvaluationNode::visualizeTrajectory(
     const std::string& method_name, const Trajectory& traj,
-    visualization_msgs::MarkerArray* markers) const {
+    visualization_msgs::msg::MarkerArray* markers) const {
   // Maybe hash the method name to a color somehow????
   // Just hardcode it for now per method name.
   mav_visualization::Color trajectory_color;
@@ -623,7 +626,7 @@ void TimeEvaluationNode::visualizeTrajectory(
   mav_msgs::EigenTrajectoryPointVector path;
   sampleWholeTrajectory(traj, kDefaultSamplingTime, &path);
 
-  visualization_msgs::Marker marker;
+  visualization_msgs::msg::Marker marker;
   marker = createMarkerForPath(path, trajectory_color, method_name);
 
   markers->markers.push_back(marker);
@@ -652,7 +655,7 @@ void TimeEvaluationNode::evaluateTrajectory(
   success &= traj.computeMinMaxMagnitude(
       derivative_order::ACCELERATION, dimensions, &a_min_actual, &a_max_actual);
   if (!success) {
-    ROS_ERROR("CAN'T COMPUTE EXTERMA!!!!");
+    RCLCPP_ERROR(rclcpp::get_logger(""), "CAN'T COMPUTE EXTERMA!!!!");
   }
   double v_max = 0.0;
   double a_max = 0.0;
@@ -724,7 +727,7 @@ bool TimeEvaluationNode::computeMinMaxMagnitudeAllSegments(
     if (!segments[segment_idx].computeMinMaxMagnitudeCandidates(
             derivative, 0.0, segments[segment_idx].getTime(), dimensions,
             &candidates)) {
-      ROS_WARN("Failed to get candidates for segment: %d", segment_idx);
+      RCLCPP_WARN(rclcpp::get_logger(""), "Failed to get candidates for segment: %d", segment_idx);
       return false;
     }
     // Evaluate candidates.
@@ -732,7 +735,7 @@ bool TimeEvaluationNode::computeMinMaxMagnitudeAllSegments(
     if (!segments[segment_idx].selectMinMaxMagnitudeFromCandidates(
             derivative, 0.0, segments[segment_idx].getTime(), dimensions,
             candidates, &minimum_candidate, &maximum_candidate)) {
-      ROS_WARN("Failed select min/max for segment: %d", segment_idx);
+      RCLCPP_WARN(rclcpp::get_logger(""), "Failed select min/max for segment: %d", segment_idx);
       return false;
     }
     maxima->push_back(maximum_candidate);
@@ -740,19 +743,19 @@ bool TimeEvaluationNode::computeMinMaxMagnitudeAllSegments(
   return true;
 }
 
-visualization_msgs::Marker TimeEvaluationNode::createMarkerForPath(
+visualization_msgs::msg::Marker TimeEvaluationNode::createMarkerForPath(
     mav_msgs::EigenTrajectoryPointVector& path,
-    const std_msgs::ColorRGBA& color, const std::string& name,
+    const std_msgs::msg::ColorRGBA& color, const std::string& name,
     double scale) const {
-  visualization_msgs::Marker path_marker;
+  visualization_msgs::msg::Marker path_marker;
 
   const int kPublishEveryNSamples = 10;
   const double kMaxMagnitude = 100.0;
 
   path_marker.header.frame_id = frame_id_;
 
-  path_marker.header.stamp = ros::Time::now();
-  path_marker.type = visualization_msgs::Marker::LINE_STRIP;
+  path_marker.header.stamp = rclcpp::Clock(RCL_SYSTEM_TIME).now(); // ros::Time::now();
+  path_marker.type = visualization_msgs::msg::Marker::LINE_STRIP;
   path_marker.color = color;
   path_marker.ns = name;
   path_marker.scale.x = scale;
@@ -771,8 +774,10 @@ visualization_msgs::Marker TimeEvaluationNode::createMarkerForPath(
       continue;
     }
 
-    geometry_msgs::Point point_msg;
-    tf::pointEigenToMsg(point.position_W, point_msg);
+    geometry_msgs::msg::Point point_msg;
+    // tf::pointEigenToMsg(point.position_W, point_msg);
+    point_msg = tf2::toMsg(point.position_W);
+
     path_marker.points.push_back(point_msg);
   }
 
@@ -841,54 +846,65 @@ void TimeEvaluationNode::outputResultsToFile(
   fprintf(fp, "%s", results.c_str());
   fclose(fp);
 
-  ROS_INFO("Output results to: %s", filename.c_str());
+  RCLCPP_INFO(rclcpp::get_logger(""), "Output results to: %s", filename.c_str());
 }
 
 }  // namespace mav_trajectory_generation
 
 int main(int argc, char** argv) {
-  ros::init(argc, argv, "time_evaluation_node");
+  rclcpp::init(argc, argv/*, "time_evaluation_node"*/);
+  
   google::InitGoogleLogging(argv[0]);
+
+#ifdef HAVE_SIGACTION
   google::InstallFailureSignalHandler();
+#endif
+  // ros::NodeHandle nh("");
+  // ros::NodeHandle nh_private("~");
+  rclcpp::Node::SharedPtr nh = std::make_shared<rclcpp::Node>("time_evaluation_node");
+  mav_trajectory_generation::TimeEvaluationNode time_eval_node(nh);
 
-  ros::NodeHandle nh("");
-  ros::NodeHandle nh_private("~");
-
-  mav_trajectory_generation::TimeEvaluationNode time_eval_node(nh, nh_private);
-
-  ROS_INFO("Initialized time evaluation node.");
+  RCLCPP_INFO(rclcpp::get_logger(""), "Initialized time evaluation node.");
 
   int num_trial_per_num_segments = 5;
   std::vector<int> num_segments_vector = {1, 2, 5, 10, 20, 30, 40, 50};
 
   int start_trial_number = 0;
   std::string output_path;
-  nh_private.param("output_path", output_path, output_path);
+  // nh_private.param("output_path", output_path, output_path);
+  nh->set_parameter(rclcpp::Parameter("output_path", output_path));
+
+  rclcpp::executors::MultiThreadedExecutor::SharedPtr multi_executor = std::make_shared<rclcpp::executors::MultiThreadedExecutor>();
+  multi_executor->add_node(nh);
 
   int trial_number = 0;
+  rclcpp::Rate rate(500);
 
   for (int i = 0; i < num_segments_vector.size(); ++i) {
     for (int j = 0; j < num_trial_per_num_segments; ++j) {
-      ROS_INFO("Trial number %d Num segments: %d", trial_number,
+      RCLCPP_INFO(rclcpp::get_logger(""), "Trial number %d Num segments: %d", trial_number,
                num_segments_vector[i]);
       std::srand(trial_number);
       time_eval_node.runBenchmark(trial_number, num_segments_vector[i]);
       trial_number++;
-      ros::spinOnce();
+      // rclcpp::spinOnce();
+      multi_executor->spin_once();
+      
       if (time_eval_node.visualize()) {
-        ros::Duration(2.0).sleep();
-        ros::spinOnce();
+        // ros::Duration(2.0).sleep();
+        // rclcpp::spinOnce();
+        rate.sleep();
+        multi_executor->spin_once();
       }
-      if (!ros::ok()) {
-        ROS_ERROR("Aborted early.");
+      if (!rclcpp::ok()) {
+        RCLCPP_ERROR(rclcpp::get_logger(""), "Aborted early.");
         return 1;
       }
     }
   }
 
-  ROS_INFO("Finished evaluations.");
-  ROS_INFO_STREAM("Results:\n" << time_eval_node.outputResultsToString().c_str()
-                               << std::endl);
+  RCLCPP_INFO(nh->get_logger(), "Finished evaluations.");
+  RCLCPP_INFO(nh->get_logger(), "Results: \n %s", time_eval_node.outputResultsToString().c_str());
 
   if (!output_path.empty()) {
     time_eval_node.outputResultsToFile(output_path);
@@ -896,7 +912,6 @@ int main(int argc, char** argv) {
 
   // Print all timing results
   mav_trajectory_generation::timing::Timing::Print(std::cout);
-
-  ros::spin();
+  multi_executor->spin();
   return 0;
 }

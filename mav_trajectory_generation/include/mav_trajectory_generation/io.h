@@ -21,6 +21,10 @@
 #ifndef MAV_TRAJECTORY_GENERATION_YAML_IO_H_
 #define MAV_TRAJECTORY_GENERATION_YAML_IO_H_
 
+#ifdef _WIN32
+#define YAML_CPP_DLL
+#endif
+
 #include <yaml-cpp/yaml.h>
 
 #include "mav_trajectory_generation/segment.h"

@@ -22,7 +22,8 @@
 #define MAV_TRAJECTORY_GENERATION_ROS_FEASIBILITY_BASE_H_
 
 #include <glog/logging.h>
-#include <ros/ros.h>
+// #include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
 #include <Eigen/Core>
 #include <Eigen/StdVector>
 
@@ -85,7 +86,8 @@ class FeasibilityBase {
   // Checks a segment for input feasibility.
   inline virtual InputFeasibilityResult checkInputFeasibility(
       const Segment& segment) const {
-    ROS_ERROR_STREAM("Input feasibility check not implemented.");
+    // ROS_ERROR_STREAM("Input feasibility check not implemented.");
+    RCLCPP_ERROR(rclcpp::get_logger(""), "Input feasibility check not implemented.");
     return InputFeasibilityResult::kInputIndeterminable;
   }
   inline InputConstraints getInputConstraints() const {

@@ -258,7 +258,7 @@ For a simple visualization:
 ```c++
 #include <mav_trajectory_generation_ros/ros_visualization.h>
 
-visualization_msgs::MarkerArray markers;
+visualization_msgs::msg::MarkerArray markers;
 double distance = 1.0; // Distance by which to seperate additional markers. Set 0.0 to disable.
 std::string frame_id = "world";
 

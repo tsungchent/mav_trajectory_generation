@@ -17,38 +17,43 @@
 #include "mav_visualization/hexacopter_marker.h"
 
 int main(int argc, char** argv) {
-  ros::init(argc, argv, "hexacopter_publisher");
-  ros::NodeHandle nh;
-  ros::NodeHandle nh_private("~");
-
-  ros::Publisher marker_pub =
-      nh_private.advertise<visualization_msgs::MarkerArray>("marker_array", 10,
-                                                            true);
+  rclcpp::init(argc, argv);
+  rclcpp::Node nh("hexacopter_publisher");
+  
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub = nh.create_publisher<visualization_msgs::msg::MarkerArray>("marker_array", 10);
+  // nh_private.advertise<visualization_msgs::msg::MarkerArray>("marker_array", 10,
+  //                                                          true);
 
   std::string frame_id("state");
   double scale = 1.0;
   bool simple = false;
 
-  nh_private.param("frame_id", frame_id, frame_id);
-  nh_private.param("scale", scale, scale);
-  nh_private.param("simple", simple, simple);
+  //nh_private.param("frame_id", frame_id, frame_id);
+  //nh_private.param("scale", scale, scale);
+  //nh_private.param("simple", simple, simple);
+  nh.set_parameter(rclcpp::Parameter("frame_id", frame_id));
+  nh.set_parameter(rclcpp::Parameter("scale", scale));
+  nh.set_parameter(rclcpp::Parameter("simple", simple));
 
   mav_visualization::HexacopterMarker hex(simple);
-  visualization_msgs::MarkerArray markers;
+  visualization_msgs::msg::MarkerArray markers;
 
   hex.setLifetime(0.0);
-  hex.setAction(visualization_msgs::Marker::ADD);
+  hex.setAction(visualization_msgs::msg::Marker::ADD);
 
-  std_msgs::Header header;
+  std_msgs::msg::Header header;
   header.frame_id = frame_id;
+  
+  rclcpp::Clock clock(RCL_SYSTEM_TIME);
+  rclcpp::Rate rate(20.0);
 
-  while (ros::ok()) {
-    header.stamp = ros::Time::now();
+  while (rclcpp::ok()) {
+    header.stamp = clock.now();
     hex.setHeader(header);
     hex.getMarkers(markers, scale, false);
-    marker_pub.publish(markers);
-    header.seq++;
-
-    ros::Duration(50.0).sleep();
+    marker_pub->publish(markers);
+    // header.seq++;
+    // ros::Duration(50.0).sleep();
+    rate.sleep();
   }
 }

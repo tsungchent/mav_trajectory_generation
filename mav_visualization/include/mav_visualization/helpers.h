@@ -20,15 +20,16 @@
 
 #include <Eigen/Eigenvalues>
 
-#include <eigen_conversions/eigen_msg.h>
-#include <std_msgs/ColorRGBA.h>
-#include <visualization_msgs/MarkerArray.h>
+// #include <eigen_conversions/eigen_msg.h>
+#include <tf2_eigen/tf2_eigen.h>
+#include <std_msgs/msg/color_rgba.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 
 namespace mav_visualization {
 
-class Color : public std_msgs::ColorRGBA {
+class Color : public std_msgs::msg::ColorRGBA {
  public:
-  Color() : std_msgs::ColorRGBA() {}
+  Color() : std_msgs::msg::ColorRGBA() {}
   Color(double red, double green, double blue) : Color(red, green, blue, 1.0) {}
   Color(double red, double green, double blue, double alpha) : Color() {
     r = red;
@@ -51,9 +52,9 @@ class Color : public std_msgs::ColorRGBA {
   static const Color Pink() { return Color(1.0, 0.0, 0.5); }
 };
 
-/// helper function to create a geometry_msgs::Point
-inline geometry_msgs::Point createPoint(double x, double y, double z) {
-  geometry_msgs::Point p;
+/// helper function to create a geometry_msgs::msg::Point
+inline geometry_msgs::msg::Point createPoint(double x, double y, double z) {
+  geometry_msgs::msg::Point p;
   p.x = x;
   p.y = y;
   p.z = z;
@@ -68,8 +69,8 @@ inline geometry_msgs::Point createPoint(double x, double y, double z) {
 // Output: marker = The marker in which the ellipsoid should be drawn
 inline void drawCovariance3D(const Eigen::Vector3d& mu,
                              const Eigen::Matrix3d& cov,
-                             const std_msgs::ColorRGBA& color, double n_sigma,
-                             visualization_msgs::Marker* marker) {
+                             const std_msgs::msg::ColorRGBA& color, double n_sigma,
+                             visualization_msgs::msg::Marker* marker) {
   // TODO(helenol): What does this do???? Does anyone know?
   const Eigen::Matrix3d changed_covariance = (cov + cov.transpose()) * 0.5;
   Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> solver(
@@ -79,17 +80,21 @@ inline void drawCovariance3D(const Eigen::Vector3d& mu,
   V.col(2) = V.col(0).cross(V.col(1));
   const Eigen::Vector3d sigma = solver.eigenvalues().cwiseSqrt() * n_sigma;
 
-  tf::pointEigenToMsg(mu, marker->pose.position);
-  tf::quaternionEigenToMsg(Eigen::Quaterniond(V), marker->pose.orientation);
-  tf::vectorEigenToMsg(sigma * 2.0, marker->scale);  // diameter, not half axis
-  marker->type = visualization_msgs::Marker::SPHERE;
+  // tf::pointEigenToMsg(mu, marker->pose.position);
+  marker->pose.position = tf2::toMsg(mu);
+  // tf::quaternionEigenToMsg(Eigen::Quaterniond(V), marker->pose.orientation);
+  marker->pose.orientation = tf2::toMsg(Eigen::Quaterniond(V));
+  // tf::vectorEigenToMsg(sigma * 2.0, marker->scale);  // diameter, not half axis
+  tf2::toMsg(sigma * 2.0, marker->scale);
+
+  marker->type = visualization_msgs::msg::Marker::SPHERE;
   marker->color = color;
-  marker->action = visualization_msgs::Marker::ADD;
+  marker->action = visualization_msgs::msg::Marker::ADD;
 }
 
 inline void drawAxes(const Eigen::Vector3d& p, const Eigen::Quaterniond& q,
                      double scale, double line_width,
-                     visualization_msgs::Marker* marker) {
+                     visualization_msgs::msg::Marker* marker) {
   marker->colors.resize(6);
   marker->points.resize(6);
   marker->points[0] = createPoint(0, 0, 0);
@@ -108,24 +113,28 @@ inline void drawAxes(const Eigen::Vector3d& p, const Eigen::Quaterniond& q,
   marker->colors[5] = Color::Blue();
 
   marker->scale.x = line_width;  // rest is unused
-  marker->type = visualization_msgs::Marker::LINE_LIST;
-  marker->action = visualization_msgs::Marker::ADD;
+  marker->type = visualization_msgs::msg::Marker::LINE_LIST;
+  marker->action = visualization_msgs::msg::Marker::ADD;
 
-  tf::pointEigenToMsg(p, marker->pose.position);
-  tf::quaternionEigenToMsg(q, marker->pose.orientation);
+  // tf::pointEigenToMsg(p, marker->pose.position);
+  // tf::quaternionEigenToMsg(q, marker->pose.orientation);
+  marker->pose.position = tf2::toMsg(p);
+  marker->pose.orientation = tf2::toMsg(q);
 }
 
 inline void drawArrowPositionOrientation(const Eigen::Vector3d& p,
                                          const Eigen::Quaterniond& q,
-                                         const std_msgs::ColorRGBA& color,
+                                         const std_msgs::msg::ColorRGBA& color,
                                          double length, double diameter,
-                                         visualization_msgs::Marker* marker) {
-  marker->type = visualization_msgs::Marker::ARROW;
-  marker->action = visualization_msgs::Marker::ADD;
+                                         visualization_msgs::msg::Marker* marker) {
+  marker->type = visualization_msgs::msg::Marker::ARROW;
+  marker->action = visualization_msgs::msg::Marker::ADD;
   marker->color = color;
 
-  tf::pointEigenToMsg(p, marker->pose.position);
-  tf::quaternionEigenToMsg(q, marker->pose.orientation);
+  // tf::pointEigenToMsg(p, marker->pose.position);
+  // tf::quaternionEigenToMsg(q, marker->pose.orientation);
+  marker->pose.position = tf2::toMsg(p);
+  marker->pose.orientation = tf2::toMsg(q);
 
   marker->scale.x = length;
   marker->scale.y = diameter;
@@ -134,15 +143,17 @@ inline void drawArrowPositionOrientation(const Eigen::Vector3d& p,
 
 inline void drawArrowPoints(const Eigen::Vector3d& p1,
                             const Eigen::Vector3d& p2,
-                            const std_msgs::ColorRGBA& color, double diameter,
-                            visualization_msgs::Marker* marker) {
-  marker->type = visualization_msgs::Marker::ARROW;
-  marker->action = visualization_msgs::Marker::ADD;
+                            const std_msgs::msg::ColorRGBA& color, double diameter,
+                            visualization_msgs::msg::Marker* marker) {
+  marker->type = visualization_msgs::msg::Marker::ARROW;
+  marker->action = visualization_msgs::msg::Marker::ADD;
   marker->color = color;
 
   marker->points.resize(2);
-  tf::pointEigenToMsg(p1, marker->points[0]);
-  tf::pointEigenToMsg(p2, marker->points[1]);
+  // tf::pointEigenToMsg(p1, marker->points[0]);
+  // tf::pointEigenToMsg(p2, marker->points[1]);
+  marker->points[0] = tf2::toMsg(p1);
+  marker->points[1] = tf2::toMsg(p2);
 
   marker->scale.x = diameter * 0.1;
   marker->scale.y = diameter * 2 * 0.1;
@@ -152,7 +163,7 @@ inline void drawArrowPoints(const Eigen::Vector3d& p1,
 inline void drawAxesArrows(const Eigen::Vector3d& p,
                            const Eigen::Quaterniond& q, double scale,
                            double diameter,
-                           visualization_msgs::MarkerArray* marker_array) {
+                           visualization_msgs::msg::MarkerArray* marker_array) {
   marker_array->markers.resize(3);
   Eigen::Vector3d origin;
   origin.setZero();
